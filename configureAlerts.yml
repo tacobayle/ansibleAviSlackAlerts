@@ -1,0 +1,102 @@
+---
+- hosts: localhost
+  connection: local
+
+  vars:
+    listVsName: []
+    listVsUuid: []
+    vsStatus:
+      - up
+      - down
+
+  vars_files:
+    - "vars/creds.json"
+    - "vars/params.yml"
+
+  roles:
+    - role: "avinetworks.avisdk"
+
+  tasks:
+
+  - name: get VS
+    avi_api_session:
+      avi_credentials: "{{ avi_credentials }}"
+      api_version: "{{ avi_credentials.api_version }}"
+      http_method: get
+      timeout: 300
+      path: virtualservice
+    register: vsUuid
+
+  - name: Append Vs uuid to the list
+    set_fact:
+      listVsUuid: "{{ listVsUuid }} + [ '{{ item.uuid }}' ]"
+    loop: "{{ vsUuid.obj.results }}"
+    loop_control:
+     label: "{{ item.uuid }}"
+
+  - name: Append Vs name to the list
+    set_fact:
+      listVsName: "{{ listVsName }} + [ '{{ item.name }}' ]"
+    loop: "{{ vsUuid.obj.results }}"
+    loop_control:
+     label: "{{ item.name }}"
+
+  - name: Create Alert Script to check when VSs are up or down
+    avi_alertscriptconfig:
+      avi_credentials: "{{ avi_credentials }}"
+      api_version: "{{ avi_credentials.api_version }}"
+      action_script: "{{ alertscriptconfig.action_script }}"
+      name: "script-{{ item.0 }}-{{ item.1 }}"
+    with_nested:
+      - "{{ listVsName }}"
+      - "{{ vsStatus }}"
+
+  - name: Create ActionGroupConfig when VSs are up or down
+    avi_actiongroupconfig:
+      avi_credentials: "{{ avi_credentials }}"
+      api_version: "{{ avi_credentials.api_version }}"
+      level: ALERT_HIGH
+      name: "agc-{{ item.0 }}-{{ item.1 }}"
+      external_only: False
+      action_script_config_ref: "/api/alertscriptconfig?name=script-{{ item.0 }}-{{ item.1 }}"
+    with_nested:
+      - "{{ listVsName }}"
+      - "{{ vsStatus }}"
+
+  - name: Create AlertConfig when VSs are up
+    avi_alertconfig:
+      avi_credentials: "{{ avi_credentials }}"
+      api_version: "{{ avi_credentials.api_version }}"
+      name: "ac-{{ item.0 }}-up"
+      obj_uuid: "/api/virtualservice/{{ item.1 }}"
+      source: EVENT_LOGS
+      object_type: VIRTUALSERVICE
+      category: REALTIME
+      alert_rule:
+        operator: OPERATOR_AND
+        sys_event_rule:
+        - event_id: VS_UP
+          not_cond: false
+      action_group_ref: "/api/actiongroupconfig?name=agc-{{ item.0 }}-up"
+    with_together:
+      - "{{ listVsName }}"
+      - "{{ listVsUuid }}"
+
+  - name: Create AlertConfig when VSs are down
+    avi_alertconfig:
+      avi_credentials: "{{ avi_credentials }}"
+      api_version: "{{ avi_credentials.api_version }}"
+      name: "ac-{{ item.0 }}-down"
+      obj_uuid: "/api/virtualservice/{{ item.1 }}"
+      source: EVENT_LOGS
+      object_type: VIRTUALSERVICE
+      category: REALTIME
+      alert_rule:
+        operator: OPERATOR_AND
+        sys_event_rule:
+        - event_id: VS_DOWN
+          not_cond: false
+      action_group_ref: "/api/actiongroupconfig?name=agc-{{ item.0 }}-down"
+    with_together:
+      - "{{ listVsName }}"
+      - "{{ listVsUuid }}"
