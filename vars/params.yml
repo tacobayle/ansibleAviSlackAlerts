@@ -1,5 +1,5 @@
 ---
-webhook_url: https://hooks.slack.com/services/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
+webhook_url: https://hooks.slack.com/services/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
 
 alertscriptconfig:
   action_script: |
