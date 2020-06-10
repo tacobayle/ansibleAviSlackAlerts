@@ -37,7 +37,26 @@ Avi 18.2.9
 
 All the paramaters/variables are stored in var/params.yml. A variable needs to be configured with webhook_url like follow:
 ```
-webhook_url: https://hooks.slack.com/services/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
+---
+webhook_url: https://hooks.slack.com/services/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
+
+alertscriptconfig:
+  action_script: |
+    #!/usr/bin/python
+    import json, requests
+    requests.packages.urllib3.disable_warnings()
+    webhook_url = "{{ webhook_url }}"
+    slack_data = {'text': "Your Virtual Service {{ item.0 }} is {{ item.1 }}"}
+
+    response = requests.post(
+        webhook_url, data=json.dumps(slack_data),
+        headers={'Content-Type': 'application/json'}
+    )
+    if response.status_code != 200:
+       raise ValueError(
+            'Request to slack returned an error %s, the response is:\n%s'
+            % (response.status_code, response.text)
+    )
 ```
 
 ## Use the ansible playbook to:
