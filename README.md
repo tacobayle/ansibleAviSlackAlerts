@@ -1,7 +1,7 @@
 # aviSlackAlerts
 
 ## Goals
-Ansible Playbook to send Slack Alert when an event is triggered.
+Ansible Playbook to send Slack Alert when an event is triggered (VS up or down)
 
 ## Prerequisites:
 1. Make sure the controller is available at the IP defined in vars/creds.json
